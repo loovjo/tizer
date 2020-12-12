@@ -1,0 +1,87 @@
+Tizer language/runtime
+Mostly used for embedded wearable computer.
+Compiler + runitme written in Rust, targeting an interpreter and ARM. Implementation should not
+require any OS, as to be able to run as a kernel.
+
+* Language
+** Message-passing based
+*** Loose idea: the current call frame is an object, control flow is based on sending messages
+    to it.
+*** "Returning" values is based on sending a response message to the call frame.
+
+*** Both queue-based and immediate
+**** Immediate sending: shift call frame to new object, return when done. May collect a response.
+***** Can be inlined (see below)
+**** Async sending: recommended. Puts message on the queue.
+***** Putting current call frame on the queue is optional.
+***** If a return value is wanted, a response handler is created and a local variable is put into
+      the call frame. When the value is requsted later, the progress is halted until the value has
+      been received.
+
+*** Everything is an object™
+    Like smalltalk. "Object" and "instance" are used interchangably. Every object has a class
+    referenced, which contains the message handling instances. The class objects have message
+    handlers for "static" methods.
+
+    ```
+x := String 'send #empty            -- Static "method" String#empty
+y := String 'send #repeat (10, 'a') -- static "Method" String:repeat
+z := x 'send #append (y)
+System 'send #println (z)
+    ```
+
+** Things should be JITted, with options to inline instance variables. When these instance variables
+   are changed, rejitting is to occur.
+*** Should global objects be inlined in the JIT?
+**** Would make classes being objects reasonable, and would make primitives being objects possibly
+     fast.
+     For example, adding two numbers would naively be done as
+     ```
+x := Int 'send_inline #make_one
+y := Int 'send_inline #make_two
+z := x 'send_inline #add (y)
+     ```
+
+     Here, Int is a global variable, referring to the Int class. #make_one and #make_two would be
+     messages, responding with the instances 1 and 2 of the Int class.
+
+     If the Int-class was to be inlined, this would natively compile to the optimal machine code.
+
+*** How should inlined variables be checked for coherency? If a variable is mutated, then inlining
+    breaks.
+**** Store a hash of every variable at mutation?
+***** Needs to be updated recursively upwards on every mutation
+***** O(n) for every mutation (n = parent height)
+***** Needs to be aware of non-owning references
+**** Compute hash of all referenced variables at call site?
+***** O(k^n) for every call (n = children depth, k = average branching)
+
+** Ownership/references?
+*** Everything could be references
+**** Bad
+*** Thing can be owned or referenced
+**** Should non-owned referenced values be kept alive?
+**** Should objects be aware of their referees?
+
+* Runtime
+** Everything is accesible from everywhere
+** Entire OS should be running in the system
+** Reflection abilities. You should be able to develop an application from inside the OS and be
+   able to inspect more or less anything
+** Export/import runtime to develop externally
+** GC?
+*** Probably have to :(
+** Recursion-score
+*** Give every message handler of every instance a score based on how many messages it sends, how
+    many messages are sent by the receivers and so on
+*** Give messages with lower score higher priority
+
+* Aesthetics
+** Mascot?
+*** Lobster, from scp-3485
+**** Illegal :(
+*** Protogen?
+**** uwu
+*** Sponge?
+**** kitchen sponge
+**** No downsides
